@@ -1,6 +1,6 @@
 # Building Web APIs with Node.js
 
-Шаблонний репозиторій для викладача дисципліни **Building Web APIs with Node.js** (BetterED Neoversity).
+Шаблонний репозиторій для викладача дисципліни **Building Web APIs with Node.js**.
 
 ## Як почати
 
