@@ -1,7 +1,13 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import swaggerUi from "swagger-ui-express";
+import { readFile } from "node:fs/promises";
 import "dotenv/config";
+
+const spec = JSON.parse(
+  await readFile(new URL("../docs/openapi.json", import.meta.url), "utf8"),
+);
 
 const app = express();
 
@@ -23,6 +29,8 @@ app.use((req, res, next) => {
   console.log("Time: ", new Date().toLocaleTimeString());
   next();
 });
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(spec));
 
 app.get("/error", (req, res) => {
   throw new Error("test error!");

@@ -1,0 +1,281 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "nodejs-129",
+    "version": "1.0.0",
+    "description": "Express REST API with stub handlers for students and a test route for the error handler. The handlers do not store data.\n\nThe app does not validate requests and does not use authentication.\n\nAny method and path that the app does not define returns `404` with the body `{ \"msg\": \"Route not found!\" }`."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [],
+  "tags": [
+    {
+      "name": "students",
+      "description": "Stub handlers for student resources."
+    },
+    {
+      "name": "debug",
+      "description": "Routes that test the app-level error handler."
+    }
+  ],
+  "paths": {
+    "/students": {
+      "get": {
+        "tags": ["students"],
+        "operationId": "getStudents",
+        "summary": "Get all students",
+        "description": "Stub handler. Always returns an empty array.",
+        "responses": {
+          "200": {
+            "description": "An empty array.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "maxItems": 0,
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "example": []
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["students"],
+        "operationId": "createStudent",
+        "summary": "Create a student",
+        "description": "Stub handler. Does not store data. Returns the fields of the request body and an `id`.\n\nThe app does not validate the body. A request with no body returns only the `id`. An array body is spread into an object with index keys: `[1,2]` returns `{ \"0\": 1, \"1\": 2, \"id\": ... }`.",
+        "requestBody": {
+          "required": false,
+          "description": "Any JSON object or array. The code does not define student fields. `express.json()` parses the body and returns `500` for malformed JSON or for a primitive top-level value.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "array",
+                    "items": {}
+                  }
+                ]
+              },
+              "example": {
+                "name": "A"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The fields of the request body and an `id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedStudent"
+                },
+                "example": {
+                  "id": 1793818425047,
+                  "name": "A"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/students/{studentId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/StudentId"
+        }
+      ],
+      "get": {
+        "tags": ["students"],
+        "operationId": "getStudentById",
+        "summary": "Get a student by ID",
+        "description": "Stub handler. Returns the `studentId` path value as `id`. No student lookup occurs, so this route does not return `404` for an unknown ID.",
+        "responses": {
+          "200": {
+            "description": "An object with the requested ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentIdResponse"
+                },
+                "example": {
+                  "id": "abc"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["students"],
+        "operationId": "updateStudent",
+        "summary": "Update a student",
+        "description": "Stub handler. Ignores the path value and the request body, and always returns an empty object. No student lookup occurs, so this route does not return `404` for an unknown ID.",
+        "requestBody": {
+          "required": false,
+          "description": "Any JSON object or array. The handler does not use the body. `express.json()` parses the body and returns `500` for malformed JSON or for a primitive top-level value.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "array",
+                    "items": {}
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EmptyObject"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["students"],
+        "operationId": "deleteStudent",
+        "summary": "Delete a student",
+        "description": "Stub handler. Ignores the path value and always returns an empty object. No student lookup occurs, so this route does not return `404` for an unknown ID.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EmptyObject"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/error": {
+      "get": {
+        "tags": ["debug"],
+        "operationId": "triggerError",
+        "summary": "Trigger a test error",
+        "description": "Throws an error on each request to test the app-level error handler. Always returns `500`.",
+        "responses": {
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "StudentId": {
+        "name": "studentId",
+        "in": "path",
+        "required": true,
+        "description": "The student ID. The app does not validate this value.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "EmptyObject": {
+        "description": "An empty object.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/EmptyObject"
+            },
+            "example": {}
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "An error from the app-level error handler. All errors passed to this handler return `500`, including body parser errors.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "message": "Oops something went wrong!"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "StudentIdResponse": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The `studentId` path value."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatedStudent": {
+        "type": "object",
+        "required": ["id"],
+        "description": "The fields of the request body and an `id`. The code does not define student fields.",
+        "properties": {
+          "id": {
+            "description": "A number from `Date.now()`. If the object request body has an `id` field, its value replaces this number and can be of any JSON type, not only those shown here.",
+            "oneOf": [
+              {
+                "type": "integer",
+                "format": "int64"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "EmptyObject": {
+        "type": "object",
+        "maxProperties": 0
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "`Oops something went wrong!` if `NODE_ENV` is `production`. In all other cases, the error stack trace."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
