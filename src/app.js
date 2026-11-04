@@ -1,34 +1,75 @@
-import path from "node:path";
-import fs from "node:fs/promises";
-import http from "node:http";
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import "dotenv/config";
 
-const carsPath = path.join(
-  import.meta.dirname,
-  "..",
-  "lessons",
-  "lesson-01",
-  "assets",
-  "cars.json",
-);
+const app = express();
 
-// Top level await
-const carsJson = await fs.readFile(carsPath, "utf-8");
-const cars = JSON.parse(carsJson);
+// Adds headers: Access-Control-Allow-Origin: *
+app.use(cors({ origin: "*" }));
 
-const server = http.createServer((req, res) => {
-  console.log(req.method, req.url);
+// Додає хедери базовоі безпеки
+app.use(helmet());
 
-  if (req.method === "GET" && req.url === "/") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ data: "Hello from home route" }));
-  }
+// Додає req.body
+app.use(express.json());
 
-  if (req.method === "GET" && req.url === "/cars") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify(cars));
-  }
+app.use((req, res, next) => {
+  console.log("Request: ", req.method, req.url);
+  next();
 });
 
-server.listen(3005, () => {
-  console.log("Server is running on http://localhost:3005");
+app.use((req, res, next) => {
+  console.log("Time: ", new Date().toLocaleTimeString());
+  next();
+});
+
+app.get("/error", (req, res) => {
+  throw new Error("test error!");
+});
+
+// GET /students
+app.get("/students", (req, res) => {
+  res.status(200).json([]);
+});
+
+// GET /students/:studentId
+app.get("/students/:studentId", (req, res) => {
+  const { studentId } = req.params;
+  res.status(200).json({ id: studentId });
+});
+
+// POST /students
+app.post("/students", (req, res) => {
+  res.status(201).json({
+    id: Date.now(),
+    ...req.body,
+  });
+});
+
+// PATCH /students/:studentId
+app.patch("/students/:studentId", (req, res) => {
+  res.status(200).json({});
+});
+
+// DELETE /students/:studentId
+app.delete("/students/:studentId", (req, res) => {
+  res.status(200).json({});
+});
+
+app.use((req, res) => {
+  res.status(404).json({ msg: "Route not found!" });
+});
+
+app.use((err, req, res, next) => {
+  //NODE_ENV development production
+  const isProd = process.env.NODE_ENV === "production";
+
+  res.status(500).json({
+    message: isProd ? err.message : err.stack,
+  });
+});
+
+app.listen(process.env.PORT, () => {
+  console.log(`Server is running on http://localhost:${process.env.PORT}`);
 });

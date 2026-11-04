@@ -26,7 +26,6 @@
 
 ## Матеріали
 
-- [`assets/client-server.jpg`](assets/client-server.jpg) — схема клієнт-серверної архітектури
 - [`assets/rest-api.jpg`](assets/rest-api.jpg) — схема клієнт-серверної архітектури з REST API
 - [`assets/cors.jpg`](assets/cors.jpg) — як працює CORS: заголовки `Origin` та `Access-Control-Allow-Origin`
 
