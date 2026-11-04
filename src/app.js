@@ -62,11 +62,10 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  //NODE_ENV development production
   const isProd = process.env.NODE_ENV === "production";
 
   res.status(500).json({
-    message: isProd ? err.message : err.stack,
+    message: isProd ? "Oops something went wrong!" : err.stack,
   });
 });
 
