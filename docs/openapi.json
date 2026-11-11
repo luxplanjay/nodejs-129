@@ -96,6 +96,67 @@
             "$ref": "#/components/responses/InternalServerError"
           }
         }
+      },
+      "delete": {
+        "tags": ["students"],
+        "operationId": "deleteStudents",
+        "summary": "Delete many students by IDs",
+        "description": "Deletes all students whose `_id` is in the `id` query parameter. Repeat the parameter for each ID: `?id=a&id=b`. IDs that do not exist are not an error.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "description": "Student IDs (MongoDB ObjectId). Repeat the parameter for each ID.",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The number of deleted students. Can be `0`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["deletedCount"],
+                  "properties": {
+                    "deletedCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "example": {
+                  "deletedCount": 2
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No `id` parameter, or an `id` is not a valid ObjectId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "message": "Query parameter 'id' is required"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
       }
     },
     "/students/{studentId}": {
