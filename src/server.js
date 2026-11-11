@@ -16,10 +16,12 @@ const spec = JSON.parse(
 const app = express();
 
 // Adds headers: Access-Control-Allow-Origin: *
-app.use(cors({ origin: "*" }));
+// app.use(cors({ origin: "*" }));
+app.use(cors());
 // Додає хедери базовоі безпеки
 app.use(helmet());
 // Додає req.body
+// app.use(express.json({limit: "100kb"}));
 app.use(express.json());
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(spec));
