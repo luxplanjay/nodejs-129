@@ -15,8 +15,8 @@ router.get("/students/:studentId", getStudentById);
 
 router.post("/students", createStudent);
 
-router.patch("/students/:studentId", updateStudent);
-
 router.delete("/students/:studentId", deleteStudent);
+
+router.patch("/students/:studentId", updateStudent);
 
 export default router;

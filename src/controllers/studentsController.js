@@ -9,28 +9,43 @@ export const getStudents = async (req, res) => {
 export const getStudentById = async (req, res) => {
   const { studentId } = req.params;
 
-  // const student = await Student.findById(studentId);
   const student = await Student.findOne({ _id: studentId });
 
   if (!student) {
-    // return res.status(404).json({ message: "Student not found!" });
     throw createHttpError(404, "Student not found");
   }
 
   res.status(200).json(student);
 };
 
-export const createStudent = (req, res) => {
-  res.status(201).json({
-    id: Date.now(),
-    ...req.body,
+export const createStudent = async (req, res) => {
+  const student = await Student.create(req.body);
+  res.status(201).json(student);
+};
+
+export const deleteStudent = async (req, res) => {
+  const { studentId } = req.params;
+
+  const student = await Student.findOneAndDelete({ _id: studentId });
+
+  if (!student) {
+    throw createHttpError(404, "Student not found");
+  }
+
+  // res.status(204).send();
+  res.status(200).json(student);
+};
+
+export const updateStudent = async (req, res) => {
+  const { studentId } = req.params;
+
+  const student = await Student.findOneAndUpdate({ _id: studentId }, req.body, {
+    returnDocument: "after",
   });
-};
 
-export const updateStudent = (req, res) => {
-  res.status(200).json({});
-};
+  if (!student) {
+    throw createHttpError(404, "Student not found");
+  }
 
-export const deleteStudent = (req, res) => {
-  res.status(200).json({});
+  res.status(200).json(student);
 };
