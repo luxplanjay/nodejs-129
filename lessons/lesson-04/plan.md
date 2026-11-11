@@ -60,5 +60,4 @@
 3. Реалізувати `POST /students` — створити документ через `Model.create()`, показати схему `http-req.jpg`
 4. Реалізувати `DELETE /students/:studentId` — видалити через `Model.findOneAndDelete()`
 5. Реалізувати `PATCH /students/:studentId` — часткове оновлення через `Model.findOneAndUpdate()`
-6. Реалізувати `PUT /students/:studentId` — повне оновлення з `upsert: true`
-7. Протестувати всі ендпоінти через Postman
+6. Протестувати всі ендпоінти через Postman
