@@ -1,8 +1,11 @@
 import createHttpError from "http-errors";
-import { isValidObjectId } from "mongoose";
 import { Student } from "../models/student.js";
 
+// /students?page=2&perPage=15
 export const getStudents = async (req, res) => {
+  const { page = 1, perPage = 5 } = req.query;
+  console.log(page, perPage);
+
   const students = await Student.find();
   res.status(200).json(students);
 };
@@ -38,16 +41,8 @@ export const deleteStudent = async (req, res) => {
 };
 
 export const deleteStudents = async (req, res) => {
-  // ?id=a → "a", ?id=a&id=b → ["a", "b"], no id → undefined
-  const ids = [].concat(req.query.id ?? []);
-
-  if (ids.length === 0) {
-    throw createHttpError(400, "Query parameter 'id' is required");
-  }
-
-  if (!ids.every((id) => isValidObjectId(id))) {
-    throw createHttpError(400, "Invalid student id");
-  }
+  // celebrate already validated id and converted it to an array
+  const ids = req.query.id;
 
   const { deletedCount } = await Student.deleteMany({ _id: { $in: ids } });
 
