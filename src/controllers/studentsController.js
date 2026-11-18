@@ -1,13 +1,50 @@
 import createHttpError from "http-errors";
 import { Student } from "../models/student.js";
 
-// /students?page=2&perPage=15
+// /students?page=2&perPage=15&minAvgMark=5&studentGender=male&search=olf&sortBy=&sortOrder=
 export const getStudents = async (req, res) => {
-  const { page = 1, perPage = 5 } = req.query;
-  console.log(page, perPage);
+  const {
+    page = 1,
+    perPage = 5,
+    minAvgMark,
+    studentGender,
+    search,
+    sortBy = "_id",
+    sortOrder = "asc",
+  } = req.query;
 
-  const students = await Student.find();
-  res.status(200).json(students);
+  const skip = (page - 1) * perPage;
+  const limit = perPage;
+
+  const filter = {};
+
+  if (minAvgMark !== undefined) {
+    filter.avgMark = { $gte: minAvgMark };
+  }
+
+  if (studentGender !== undefined) {
+    filter.gender = { $eq: studentGender };
+  }
+
+  if (search !== undefined) {
+    filter.name = { $regex: RegExp.escape(search), $options: "i" };
+  }
+
+  const [students, totalItems] = await Promise.all([
+    Student.find(filter)
+      .sort({ [sortBy]: sortOrder })
+      .skip(skip)
+      .limit(limit),
+    Student.countDocuments(filter),
+  ]);
+
+  const totalPages = Math.ceil(totalItems / perPage);
+
+  res.status(200).json({
+    totalItems,
+    totalPages,
+    students,
+  });
 };
 
 export const getStudentById = async (req, res) => {

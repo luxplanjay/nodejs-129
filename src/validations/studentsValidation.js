@@ -6,6 +6,11 @@ export const getStudentsSchema = {
   [Segments.QUERY]: Joi.object({
     page: Joi.number().integer().min(1),
     perPage: Joi.number().integer().min(5).max(20),
+    minAvgMark: Joi.number().positive(),
+    studentGender: Joi.string().valid("male", "female", "other"),
+    search: Joi.string().trim().allow(""),
+    sortBy: Joi.string().valid("name", "age", "avgMark", "createdAt"),
+    sortOrder: Joi.string().valid("asc", "desc"),
   }),
 };
 
