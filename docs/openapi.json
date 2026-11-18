@@ -3,7 +3,7 @@
   "info": {
     "title": "nodejs-129",
     "version": "1.0.0",
-    "description": "Express REST API with stub handlers for students and a test route for the error handler. The handlers do not store data.\n\nThe app does not validate requests and does not use authentication.\n\nAny method and path that the app does not define returns `404` with the body `{ \"msg\": \"Route not found!\" }`."
+    "description": "Express REST API for students. The app stores data in MongoDB with Mongoose.\n\nThe app validates requests with celebrate and Joi. A request that fails validation returns `400`. The app does not use authentication.\n\nAny method and path that the app does not define returns `404` with the body `{ \"msg\": \"Route not found!\" }`."
   },
   "servers": [
     {
@@ -14,11 +14,7 @@
   "tags": [
     {
       "name": "students",
-      "description": "Stub handlers for student resources."
-    },
-    {
-      "name": "debug",
-      "description": "Routes that test the app-level error handler."
+      "description": "Student resources stored in MongoDB."
     }
   ],
   "paths": {
@@ -26,23 +22,114 @@
       "get": {
         "tags": ["students"],
         "operationId": "getStudents",
-        "summary": "Get all students",
-        "description": "Stub handler. Always returns an empty array.",
+        "summary": "Get a page of students",
+        "description": "Returns one page of students. You can filter and sort the list.\n\nAll filters apply together. `totalItems` and `totalPages` count only the students that match the filters. If `page` is more than `totalPages`, `students` is an empty array.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "The page number.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "required": false,
+            "description": "The number of students on one page.",
+            "schema": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 20,
+              "default": 5
+            }
+          },
+          {
+            "name": "minAvgMark",
+            "in": "query",
+            "required": false,
+            "description": "Return only students with `avgMark` greater than or equal to this value. The value must be more than `0`.",
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "studentGender",
+            "in": "query",
+            "required": false,
+            "description": "Return only students with this `gender`.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female", "other"]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Return only students whose `name` contains this text. The search is not case-sensitive. Regular expression characters are escaped, so they match as plain text. The app trims spaces at the start and the end. An empty value matches all students.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "required": false,
+            "description": "The field to sort by. If you do not send it, the list is sorted by `_id`.",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "age", "avgMark", "createdAt"]
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "required": false,
+            "description": "The sort direction.",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "An empty array.",
+            "description": "One page of students and the totals for the filtered list.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "maxItems": 0,
-                  "items": {
-                    "type": "object"
-                  }
+                  "$ref": "#/components/schemas/StudentsPage"
                 },
-                "example": []
+                "example": {
+                  "totalItems": 12,
+                  "totalPages": 3,
+                  "students": [
+                    {
+                      "_id": "6740b1f2c3a4d5e6f7a8b9c0",
+                      "name": "Olfa Kovalenko",
+                      "age": 21,
+                      "gender": "female",
+                      "avgMark": 10.5,
+                      "onDuty": false,
+                      "createdAt": "2026-11-18T10:00:00.000Z",
+                      "updatedAt": "2026-11-18T10:00:00.000Z",
+                      "__v": 0
+                    }
+                  ]
+                }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
@@ -53,44 +140,37 @@
         "tags": ["students"],
         "operationId": "createStudent",
         "summary": "Create a student",
-        "description": "Stub handler. Does not store data. Returns the fields of the request body and an `id`.\n\nThe app does not validate the body. A request with no body returns only the `id`. An array body is spread into an object with index keys: `[1,2]` returns `{ \"0\": 1, \"1\": 2, \"id\": ... }`.",
+        "description": "Creates a student in the database and returns the new student.",
         "requestBody": {
-          "required": false,
-          "description": "Any JSON object or array. The code does not define student fields. `express.json()` parses the body and returns `500` for malformed JSON or for a primitive top-level value.",
+          "required": true,
+          "description": "`express.json()` parses the body and returns `500` for malformed JSON.",
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  {
-                    "type": "array",
-                    "items": {}
-                  }
-                ]
+                "$ref": "#/components/schemas/CreateStudentBody"
               },
               "example": {
-                "name": "A"
+                "name": "Olfa Kovalenko",
+                "age": 21,
+                "gender": "female",
+                "avgMark": 10.5
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "The fields of the request body and an `id`.",
+            "description": "The new student.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreatedStudent"
-                },
-                "example": {
-                  "id": 1793818425047,
-                  "name": "A"
+                  "$ref": "#/components/schemas/Student"
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
@@ -145,10 +225,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ValidationError"
                 },
                 "example": {
-                  "message": "Query parameter 'id' is required"
+                  "statusCode": 400,
+                  "error": "Bad Request",
+                  "message": "Validation failed",
+                  "validation": {
+                    "query": {
+                      "source": "query",
+                      "keys": ["id"],
+                      "message": "\"id\" is required"
+                    }
+                  }
                 }
               }
             }
@@ -169,20 +258,16 @@
         "tags": ["students"],
         "operationId": "getStudentById",
         "summary": "Get a student by ID",
-        "description": "Stub handler. Returns the `studentId` path value as `id`. No student lookup occurs, so this route does not return `404` for an unknown ID.",
+        "description": "Returns the student with this ID.",
         "responses": {
           "200": {
-            "description": "An object with the requested ID.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StudentIdResponse"
-                },
-                "example": {
-                  "id": "abc"
-                }
-              }
-            }
+            "$ref": "#/components/responses/StudentResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/StudentNotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
@@ -193,30 +278,30 @@
         "tags": ["students"],
         "operationId": "updateStudent",
         "summary": "Update a student",
-        "description": "Stub handler. Ignores the path value and the request body, and always returns an empty object. No student lookup occurs, so this route does not return `404` for an unknown ID.",
+        "description": "Changes the fields of the student that are in the request body. Returns the student after the update.",
         "requestBody": {
-          "required": false,
-          "description": "Any JSON object or array. The handler does not use the body. `express.json()` parses the body and returns `500` for malformed JSON or for a primitive top-level value.",
+          "required": true,
+          "description": "At least one field. `express.json()` parses the body and returns `500` for malformed JSON.",
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  {
-                    "type": "array",
-                    "items": {}
-                  }
-                ]
+                "$ref": "#/components/schemas/UpdateStudentBody"
+              },
+              "example": {
+                "avgMark": 11
               }
             }
           }
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/EmptyObject"
+            "$ref": "#/components/responses/StudentResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/StudentNotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
@@ -227,24 +312,17 @@
         "tags": ["students"],
         "operationId": "deleteStudent",
         "summary": "Delete a student",
-        "description": "Stub handler. Ignores the path value and always returns an empty object. No student lookup occurs, so this route does not return `404` for an unknown ID.",
+        "description": "Deletes the student with this ID. Returns the deleted student.",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/EmptyObject"
+            "$ref": "#/components/responses/StudentResponse"
           },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        }
-      }
-    },
-    "/error": {
-      "get": {
-        "tags": ["debug"],
-        "operationId": "triggerError",
-        "summary": "Trigger a test error",
-        "description": "Throws an error on each request to test the app-level error handler. Always returns `500`.",
-        "responses": {
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/StudentNotFound"
+          },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
@@ -258,26 +336,60 @@
         "name": "studentId",
         "in": "path",
         "required": true,
-        "description": "The student ID. The app does not validate this value.",
+        "description": "The student ID. It must be a valid MongoDB ObjectId.",
         "schema": {
           "type": "string"
         }
       }
     },
     "responses": {
-      "EmptyObject": {
-        "description": "An empty object.",
+      "StudentResponse": {
+        "description": "The student.",
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/EmptyObject"
+              "$ref": "#/components/schemas/Student"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "The request failed celebrate validation.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ValidationError"
             },
-            "example": {}
+            "example": {
+              "statusCode": 400,
+              "error": "Bad Request",
+              "message": "Validation failed",
+              "validation": {
+                "query": {
+                  "source": "query",
+                  "keys": ["perPage"],
+                  "message": "\"perPage\" must be less than or equal to 20"
+                }
+              }
+            }
+          }
+        }
+      },
+      "StudentNotFound": {
+        "description": "No student has this ID.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "message": "Student not found"
+            }
           }
         }
       },
       "InternalServerError": {
-        "description": "An error from the app-level error handler. All errors passed to this handler return `500`, including body parser errors.",
+        "description": "An error from the app-level error handler that is not an `http-errors` error, for example a body parser error or a database error.",
         "content": {
           "application/json": {
             "schema": {
@@ -291,40 +403,178 @@
       }
     },
     "schemas": {
-      "StudentIdResponse": {
+      "Student": {
         "type": "object",
-        "required": ["id"],
+        "required": [
+          "_id",
+          "name",
+          "age",
+          "gender",
+          "avgMark",
+          "onDuty",
+          "createdAt",
+          "updatedAt"
+        ],
         "properties": {
-          "id": {
+          "_id": {
             "type": "string",
-            "description": "The `studentId` path value."
+            "description": "MongoDB ObjectId."
+          },
+          "name": {
+            "type": "string"
+          },
+          "age": {
+            "type": "number"
+          },
+          "gender": {
+            "type": "string",
+            "enum": ["male", "female", "other"]
+          },
+          "avgMark": {
+            "type": "number"
+          },
+          "onDuty": {
+            "type": "boolean",
+            "default": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "__v": {
+            "type": "integer",
+            "description": "Mongoose version key. Documents that were not created with Mongoose, for example seed data, do not have it."
+          }
+        }
+      },
+      "StudentsPage": {
+        "type": "object",
+        "required": ["totalItems", "totalPages", "students"],
+        "properties": {
+          "totalItems": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of students that match the filters."
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of pages for `perPage`. `0` if no students match."
+          },
+          "students": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Student"
+            }
           }
         },
         "additionalProperties": false
       },
-      "CreatedStudent": {
+      "CreateStudentBody": {
         "type": "object",
-        "required": ["id"],
-        "description": "The fields of the request body and an `id`. The code does not define student fields.",
+        "required": ["name", "age", "gender", "avgMark"],
         "properties": {
-          "id": {
-            "description": "A number from `Date.now()`. If the object request body has an `id` field, its value replaces this number and can be of any JSON type, not only those shown here.",
-            "oneOf": [
-              {
-                "type": "integer",
-                "format": "int64"
-              },
-              {
-                "type": "string"
-              }
-            ]
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 50
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 80
+          },
+          "gender": {
+            "type": "string",
+            "enum": ["male", "female", "other"]
+          },
+          "avgMark": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 15
+          },
+          "onDuty": {
+            "type": "boolean"
           }
         },
-        "additionalProperties": true
+        "additionalProperties": false
       },
-      "EmptyObject": {
+      "UpdateStudentBody": {
         "type": "object",
-        "maxProperties": 0
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 50
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 80
+          },
+          "gender": {
+            "type": "string",
+            "enum": ["male", "female", "other"]
+          },
+          "avgMark": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 15
+          },
+          "onDuty": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": ["statusCode", "error", "message", "validation"],
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "enum": [400]
+          },
+          "error": {
+            "type": "string",
+            "example": "Bad Request"
+          },
+          "message": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "validation": {
+            "type": "object",
+            "description": "One key for the request segment that failed: `query`, `params`, or `body`.",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["source", "keys", "message"],
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "enum": ["query", "params", "body"]
+                },
+                "keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The paths of the invalid fields."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The Joi error message."
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "ErrorResponse": {
         "type": "object",
@@ -332,7 +582,7 @@
         "properties": {
           "message": {
             "type": "string",
-            "description": "`Oops something went wrong!` if `NODE_ENV` is `production`. In all other cases, the error stack trace."
+            "description": "For an `http-errors` error, the error message, for example `Student not found`. For other errors: `Oops something went wrong!` if `NODE_ENV` is `production`, and the error stack trace in all other cases."
           }
         },
         "additionalProperties": false
