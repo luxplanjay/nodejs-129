@@ -4,11 +4,13 @@ import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 import { readFile } from "node:fs/promises";
 import { errors } from "celebrate";
+import cookieParser from "cookie-parser";
 import "dotenv/config";
 import { connectMongoDB } from "./db/connectMongoDB.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFoundHandler } from "./middleware/notFoundHandler.js";
 import studentsRoutes from "./routes/studentsRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 const spec = JSON.parse(
   await readFile(new URL("../docs/openapi.json", import.meta.url), "utf8"),
@@ -25,8 +27,12 @@ app.use(helmet());
 // app.use(express.json({limit: "100kb"}));
 app.use(express.json());
 
+// Додає req.cookies
+app.use(cookieParser());
+
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(spec));
 
+app.use(authRoutes);
 app.use(studentsRoutes);
 
 app.use(notFoundHandler);
