@@ -16,7 +16,9 @@ export const getStudents = async (req, res) => {
   const skip = (page - 1) * perPage;
   const limit = perPage;
 
-  const filter = {};
+  const filter = {
+    userId: { $eq: req.user._id },
+  };
 
   if (minAvgMark !== undefined) {
     filter.avgMark = { $gte: minAvgMark };
@@ -50,7 +52,10 @@ export const getStudents = async (req, res) => {
 export const getStudentById = async (req, res) => {
   const { studentId } = req.params;
 
-  const student = await Student.findOne({ _id: studentId });
+  const student = await Student.findOne({
+    _id: studentId,
+    userId: req.user._id,
+  });
 
   if (!student) {
     throw createHttpError(404, "Student not found");
@@ -60,14 +65,20 @@ export const getStudentById = async (req, res) => {
 };
 
 export const createStudent = async (req, res) => {
-  const student = await Student.create(req.body);
+  const student = await Student.create({
+    ...req.body,
+    userId: req.user._id,
+  });
   res.status(201).json(student);
 };
 
 export const deleteStudent = async (req, res) => {
   const { studentId } = req.params;
 
-  const student = await Student.findOneAndDelete({ _id: studentId });
+  const student = await Student.findOneAndDelete({
+    _id: studentId,
+    userId: req.user._id,
+  });
 
   if (!student) {
     throw createHttpError(404, "Student not found");
@@ -81,7 +92,10 @@ export const deleteStudents = async (req, res) => {
   // celebrate already validated id and converted it to an array
   const ids = req.query.id;
 
-  const { deletedCount } = await Student.deleteMany({ _id: { $in: ids } });
+  const { deletedCount } = await Student.deleteMany({
+    _id: { $in: ids },
+    userId: req.user._id,
+  });
 
   res.status(200).json({ deletedCount });
 };
@@ -89,9 +103,13 @@ export const deleteStudents = async (req, res) => {
 export const updateStudent = async (req, res) => {
   const { studentId } = req.params;
 
-  const student = await Student.findOneAndUpdate({ _id: studentId }, req.body, {
-    returnDocument: "after",
-  });
+  const student = await Student.findOneAndUpdate(
+    { _id: studentId, userId: req.user._id },
+    req.body,
+    {
+      returnDocument: "after",
+    },
+  );
 
   if (!student) {
     throw createHttpError(404, "Student not found");
