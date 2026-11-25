@@ -3,7 +3,7 @@
   "info": {
     "title": "nodejs-129",
     "version": "1.0.0",
-    "description": "Express REST API for students. The app stores data in MongoDB with Mongoose.\n\nThe app validates requests with celebrate and Joi. A request that fails validation returns `400`. The app does not use authentication.\n\nAny method and path that the app does not define returns `404` with the body `{ \"msg\": \"Route not found!\" }`."
+    "description": "Express REST API for students. The app stores data in MongoDB with Mongoose.\n\nThe app validates requests with celebrate and Joi. A request that fails validation returns `400`.\n\nThe app uses cookie sessions. `POST /auth/register`, `POST /auth/login`, and `POST /auth/refresh` set three cookies: `accessToken` (15 minutes), `refreshToken` (24 hours), and `sessionId` (24 hours). All cookies are `HttpOnly`, `Secure`, and `SameSite=None`. All `/students` endpoints require the `accessToken` and `sessionId` cookies. Each user sees and changes only the students that the user created. When the access token expires, call `POST /auth/refresh`.\n\nAny method and path that the app does not define returns `404` with the body `{ \"msg\": \"Route not found!\" }`. Exception: the authentication middleware runs for each path that starts with `/students`, so an unknown path such as `/students/a/b` without valid cookies returns `401`."
   },
   "servers": [
     {
@@ -13,17 +13,278 @@
   "security": [],
   "tags": [
     {
+      "name": "auth",
+      "description": "User registration, login, logout, and session refresh with cookies."
+    },
+    {
       "name": "students",
       "description": "Student resources stored in MongoDB."
     }
   ],
   "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "registerUser",
+        "summary": "Register a user",
+        "description": "Creates a user, creates a session, and sets the session cookies. Returns the new user. The app stores a bcrypt hash of the password and does not return it. If you do not send `username`, the app sets it to `email`.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "description": "`express.json()` parses the body and returns `500` for malformed JSON.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserBody"
+              },
+              "example": {
+                "email": "olfa@example.com",
+                "password": "secret123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new user. The response sets the session cookies.",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SetSessionCookies"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed celebrate validation, or a user with this email already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                },
+                "examples": {
+                  "validation": {
+                    "summary": "Validation failed",
+                    "value": {
+                      "statusCode": 400,
+                      "error": "Bad Request",
+                      "message": "Validation failed",
+                      "validation": {
+                        "body": {
+                          "source": "body",
+                          "keys": ["password"],
+                          "message": "\"password\" length must be at least 8 characters long"
+                        }
+                      }
+                    }
+                  },
+                  "emailInUse": {
+                    "summary": "Email in use",
+                    "value": {
+                      "message": "Email in use"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "loginUser",
+        "summary": "Log in a user",
+        "description": "Checks the email and password. Deletes one existing session of the user, creates a new session, and sets the session cookies. Returns the user.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "description": "`express.json()` parses the body and returns `500` for malformed JSON.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginUserBody"
+              },
+              "example": {
+                "email": "olfa@example.com",
+                "password": "secret123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user. The response sets the session cookies.",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SetSessionCookies"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "No user has this email, or the password is incorrect.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "message": "Invalid credentials"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "logoutUser",
+        "summary": "Log out a user",
+        "description": "Deletes the session from the `sessionId` cookie, if the cookie is present, and clears the `accessToken`, `refreshToken`, and `sessionId` cookies. Always returns `204`, also without cookies.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SessionIdCookie"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The session is deleted. No body.",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/ClearSessionCookies"
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "refreshSession",
+        "summary": "Refresh the session",
+        "description": "Finds the session from the `sessionId` and `refreshToken` cookies. If the refresh token is valid, deletes the old session, creates a new session, and sets new session cookies. If the refresh token expired, deletes the session and clears the cookies.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SessionIdCookie"
+          },
+          {
+            "name": "refreshToken",
+            "in": "cookie",
+            "required": true,
+            "description": "The refresh token of the session.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session is refreshed. The response sets new session cookies.",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SetSessionCookies"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponse"
+                },
+                "example": {
+                  "messages": "Session refresh success!"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A cookie is missing (`No session creds`), no session matches the cookies (`Bad session`), or the refresh token expired (`Session token expired`). For an expired token, the response also clears the session cookies.",
+            "headers": {
+              "Set-Cookie": {
+                "$ref": "#/components/headers/ClearSessionCookies"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "noCreds": {
+                    "summary": "A cookie is missing",
+                    "value": {
+                      "message": "No session creds"
+                    }
+                  },
+                  "badSession": {
+                    "summary": "No session matches the cookies",
+                    "value": {
+                      "message": "Bad session"
+                    }
+                  },
+                  "expired": {
+                    "summary": "The refresh token expired",
+                    "value": {
+                      "message": "Session token expired"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
     "/students": {
       "get": {
         "tags": ["students"],
         "operationId": "getStudents",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "summary": "Get a page of students",
-        "description": "Returns one page of students. You can filter and sort the list.\n\nAll filters apply together. `totalItems` and `totalPages` count only the students that match the filters. If `page` is more than `totalPages`, `students` is an empty array.",
+        "description": "Returns one page of the students of the current user. You can filter and sort the list.\n\nAll filters apply together. `totalItems` and `totalPages` count only the students that match the filters. If `page` is more than `totalPages`, `students` is an empty array.",
         "parameters": [
           {
             "name": "page",
@@ -119,6 +380,7 @@
                       "gender": "female",
                       "avgMark": 10.5,
                       "onDuty": false,
+                      "userId": "6740a0e1b2c3d4e5f6a7b8c9",
                       "createdAt": "2026-11-18T10:00:00.000Z",
                       "updatedAt": "2026-11-18T10:00:00.000Z",
                       "__v": 0
@@ -131,6 +393,9 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
@@ -139,8 +404,13 @@
       "post": {
         "tags": ["students"],
         "operationId": "createStudent",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "summary": "Create a student",
-        "description": "Creates a student in the database and returns the new student.",
+        "description": "Creates a student in the database and returns the new student. The app sets `userId` to the ID of the current user.",
         "requestBody": {
           "required": true,
           "description": "`express.json()` parses the body and returns `500` for malformed JSON.",
@@ -172,6 +442,9 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
@@ -180,8 +453,13 @@
       "delete": {
         "tags": ["students"],
         "operationId": "deleteStudents",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "summary": "Delete many students by IDs",
-        "description": "Deletes all students whose `_id` is in the `id` query parameter. Repeat the parameter for each ID: `?id=a&id=b`. IDs that do not exist are not an error.",
+        "description": "Deletes all students whose `_id` is in the `id` query parameter. Repeat the parameter for each ID: `?id=a&id=b`. IDs that do not exist, and IDs of students of other users, are not an error. The app does not delete them and does not count them.",
         "parameters": [
           {
             "name": "id",
@@ -242,6 +520,9 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
@@ -257,8 +538,13 @@
       "get": {
         "tags": ["students"],
         "operationId": "getStudentById",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "summary": "Get a student by ID",
-        "description": "Returns the student with this ID.",
+        "description": "Returns the student with this ID. The student must belong to the current user.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/StudentResponse"
@@ -269,6 +555,9 @@
           "404": {
             "$ref": "#/components/responses/StudentNotFound"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
@@ -277,8 +566,13 @@
       "patch": {
         "tags": ["students"],
         "operationId": "updateStudent",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "summary": "Update a student",
-        "description": "Changes the fields of the student that are in the request body. Returns the student after the update.",
+        "description": "Changes the fields of the student that are in the request body. Returns the student after the update. The student must belong to the current user.",
         "requestBody": {
           "required": true,
           "description": "At least one field. `express.json()` parses the body and returns `500` for malformed JSON.",
@@ -303,6 +597,9 @@
           "404": {
             "$ref": "#/components/responses/StudentNotFound"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
@@ -311,8 +608,13 @@
       "delete": {
         "tags": ["students"],
         "operationId": "deleteStudent",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "summary": "Delete a student",
-        "description": "Deletes the student with this ID. Returns the deleted student.",
+        "description": "Deletes the student with this ID. Returns the deleted student. The student must belong to the current user.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/StudentResponse"
@@ -323,6 +625,9 @@
           "404": {
             "$ref": "#/components/responses/StudentNotFound"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
@@ -331,7 +636,24 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "accessToken",
+        "description": "The access token from the `accessToken` cookie. The authentication middleware also requires the `sessionId` cookie. The access token is valid for 15 minutes. Swagger UI \"Try it out\" does not support cookie authentication."
+      }
+    },
     "parameters": {
+      "SessionIdCookie": {
+        "name": "sessionId",
+        "in": "cookie",
+        "required": false,
+        "description": "The session ID (MongoDB ObjectId).",
+        "schema": {
+          "type": "string"
+        }
+      },
       "StudentId": {
         "name": "studentId",
         "in": "path",
@@ -342,7 +664,36 @@
         }
       }
     },
+    "headers": {
+      "SetSessionCookies": {
+        "description": "Sets three cookies: `accessToken` (`Max-Age` 15 minutes), `refreshToken` (`Max-Age` 24 hours), and `sessionId` (`Max-Age` 24 hours). Each cookie has `HttpOnly`, `Secure`, and `SameSite=None`.",
+        "schema": {
+          "type": "string"
+        },
+        "example": "accessToken=0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d; Max-Age=900; Path=/; HttpOnly; Secure; SameSite=None"
+      },
+      "ClearSessionCookies": {
+        "description": "Clears the `accessToken`, `refreshToken`, and `sessionId` cookies.",
+        "schema": {
+          "type": "string"
+        },
+        "example": "accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      }
+    },
     "responses": {
+      "Unauthorized": {
+        "description": "The `accessToken` or `sessionId` cookie is missing, no session matches the cookies, the access token expired, or the user of the session does not exist. The authentication middleware runs before validation, so this response comes before `400`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "message": "Bad session"
+            }
+          }
+        }
+      },
       "StudentResponse": {
         "description": "The student.",
         "content": {
@@ -376,7 +727,7 @@
         }
       },
       "StudentNotFound": {
-        "description": "No student has this ID.",
+        "description": "No student of the current user has this ID.",
         "content": {
           "application/json": {
             "schema": {
@@ -412,6 +763,7 @@
           "gender",
           "avgMark",
           "onDuty",
+          "userId",
           "createdAt",
           "updatedAt"
         ],
@@ -436,6 +788,10 @@
           "onDuty": {
             "type": "boolean",
             "default": false
+          },
+          "userId": {
+            "type": "string",
+            "description": "The ID (MongoDB ObjectId) of the user that created the student."
           },
           "createdAt": {
             "type": "string",
@@ -528,6 +884,79 @@
           },
           "onDuty": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "User": {
+        "type": "object",
+        "required": ["_id", "username", "email", "createdAt", "updatedAt"],
+        "description": "A user. The app does not return the password hash.",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "MongoDB ObjectId."
+          },
+          "username": {
+            "type": "string",
+            "description": "The app sets it to `email` when the user is created."
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "__v": {
+            "type": "integer",
+            "description": "Mongoose version key."
+          }
+        }
+      },
+      "RegisterUserBody": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 30
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginUserBody": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefreshResponse": {
+        "type": "object",
+        "required": ["messages"],
+        "properties": {
+          "messages": {
+            "type": "string",
+            "description": "The key is `messages`, not `message`."
           }
         },
         "additionalProperties": false
